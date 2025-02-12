@@ -20,7 +20,7 @@ describe("Oracle Contract", function () {
         await oracle.waitForDeployment();
 
         // Sample tokenized bond identifier
-        tokenizedBond = "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6";
+        tokenizedBond = "1021";
     });
 
     it("Should return correct stablecoin price from Chainlink", async function () {
@@ -31,18 +31,18 @@ describe("Oracle Contract", function () {
     });
 
     it("Should allow owner to update tokenized bond price", async function () {
-        await oracle.connect(owner).updateBondPrice(tokenizedBond, ethers.parseUnits("100", 18)); // $100
-        const bondPrice = await oracle.getBondPrice(tokenizedBond);
+        await oracle.connect(owner).updateTokenPrice(tokenizedBond, ethers.parseUnits("100", 18)); // $100
+        const bondPrice = await oracle.getTokenPrice(tokenizedBond);
         expect(bondPrice).to.equal(ethers.parseUnits("100", 18));
     });
 
     it("Should not allow non-owner to update bond price", async function () {
         await expect(
-            oracle.connect(addr1).updateBondPrice(tokenizedBond, ethers.parseUnits("50", 18))
+            oracle.connect(addr1).updateTokenPrice(tokenizedBond, ethers.parseUnits("50", 18))
         ).to.be.reverted;
     });
 
     it("Should return 0 for unregistered tokenized bonds", async function () {
-        await expect( oracle.getBondPrice("0x000000000000000000000000000000000000dead")).to.be.reverted;
+        await expect( oracle.getTokenPrice("1")).to.be.reverted;
     });
 });

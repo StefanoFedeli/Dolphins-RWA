@@ -5,36 +5,36 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 contract Oracle is Ownable {
-    // Mapping for tokenized bond prices (manual update)
-    mapping(address => uint256) private bondPrices;
+    // Mapping for tokenized assets by IDs to prices (manual update)
+    mapping(uint256 => uint256) private blueDolphinTokens;
 
     // Mapping for stablecoin price feeds from Chainlink
     mapping(address => AggregatorV3Interface) private stablecoinOracles;
 
-    event BondPriceUpdated(address indexed bond, uint256 price);
+    event TokenPriceUpdated(uint256 indexed tokenID, uint256 price);
     event StablecoinOracleSet(address indexed stablecoin, address oracle);
 
     constructor(address _platformWallet) Ownable(_platformWallet) {}
 
     /**
-     * @dev Updates the price of a tokenized bond (only callable by owner).
-     * @param bond Address of the tokenized bond.
+     * @dev Updates the price of a tokenized tokenized asset (only callable by owner).
+     * @param tokenID ID of the BlueDolphin Token.
      * @param price New price in USD (with 18 decimals precision).
      */
-    function updateBondPrice(address bond, uint256 price) external onlyOwner {
+    function updateTokenPrice(uint256 tokenID, uint256 price) external onlyOwner {
         require(price > 0, "Invalid price");
-        bondPrices[bond] = price;
-        emit BondPriceUpdated(bond, price);
+        blueDolphinTokens[tokenID] = price;
+        emit TokenPriceUpdated(tokenID, price);
     }
 
     /**
-     * @dev Returns the latest price of a tokenized bond.
-     * @param bond Address of the tokenized bond.
+     * @dev Returns the latest price of a tokenized asset.
+     * @param tokenID ID of the tokenized asset.
      * @return price in USD (18 decimals precision).
      */
-    function getBondPrice(address bond) external view returns (uint256) {
-        require(bondPrices[bond] > 0, "Price not available");
-        return bondPrices[bond];
+    function getTokenPrice(uint256 tokenID) external view returns (uint256) {
+        require(blueDolphinTokens[tokenID] > 0, "Price not available");
+        return blueDolphinTokens[tokenID];
     }
 
     /**
