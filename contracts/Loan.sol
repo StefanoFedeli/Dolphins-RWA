@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "hardhat/console.sol";  // ✅ Import Hardhat's console for debugging
 import "./Oracle.sol";
 
 
@@ -49,7 +50,7 @@ contract Loan is ReentrancyGuard, Ownable {
         principalTokenAmount = _principal;
         principalTokenId = _principalTokenId;
         collateralToken = IERC20(_collateralToken);
-        collateralTokenAmount = (oracle.getTokenPrice(principalTokenId)*_principal) + ((oracle.getTokenPrice(principalTokenId)*_principal) * (_risk / 10000));
+        collateralTokenAmount = (oracle.getTokenPrice(principalTokenId)*_principal) + ((oracle.getTokenPrice(principalTokenId)*_principal) * (_risk / 100));
         liquidationTreashold = _risk - 2000 ; // 12000 = 120% by default
         interestRate = _interestRate;
         startTime = 0;

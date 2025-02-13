@@ -11,50 +11,55 @@ describe("Loan Contract", function () {
     let borrower;
     let collateralTokenAddress;
 
-    const principalAmount = ethers.utils.parseUnits("1000", 18);
+    const principalAmount = ethers.parseUnits("1", 18);
     const principalTokenId = 1;
-    const interestRate = ethers.utils.parseUnits("5", 16); // 5%
+    const interestRate = ethers.parseUnits("500",0); // 5%
     const risk = 14000; // 140%
 
     beforeEach(async function () {
         const Oracle = await ethers.getContractFactory("Oracle");
-        const TestToken = await ethers.getContractFactory("ERC20");
+        const TestToken = await ethers.getContractFactory("MockERC20");
+        const MockPriceFeed = await ethers.getContractFactory("MockV3Aggregator");
         const LoanContract = await ethers.getContractFactory("Loan");
 
         [platform, lender, borrower, collateralTokenAddress] = await ethers.getSigners();
 
-        oracle = await Oracle.deploy(platform.address);
-        await oracle.deployed();
+        stablecoinPriceFeed = await MockPriceFeed.deploy(8, ethers.parseUnits("1", 8)); 
+        await stablecoinPriceFeed.waitForDeployment();
 
-        testToken = await TestToken.deploy("TestToken", "TST");
-        await testToken.deployed();
+
+        oracle = await Oracle.deploy(platform.address);
+        await oracle.waitForDeployment();
+
+        testToken = await TestToken.deploy("TestToken", "TST",100000000000000);
+        await testToken.waitForDeployment();
+
+        // Set token price in oracle
+        await oracle.connect(platform).updateTokenPrice(principalTokenId, ethers.parseUnits("2",0)); // $2
+        await oracle.connect(platform).setStablecoinOracle(testToken.target,stablecoinPriceFeed.target);
 
         loan = await LoanContract.deploy(
             lender.address,
             borrower.address,
-            testToken.address,
+            testToken.target,
             platform.address,
-            oracle.address,
+            oracle.target,
             principalAmount,
             principalTokenId,
             interestRate,
             risk
         );
-        await loan.deployed();
+        await loan.waitForDeployment();
 
         // Mint test tokens to borrower
-        await testToken.mint(borrower.address, ethers.utils.parseUnits("2000", 18));
+        await testToken.mint(borrower.address, ethers.parseUnits("5000", 18));
 
-        // Set token price in oracle
-        await oracle.connect(platform).updateTokenPrice(principalTokenId, ethers.utils.parseUnits("1", 18));
     });
 
     it("Should create a loan and deposit collateral", async function () {
-        const collateralAmount = ethers.utils.parseUnits("1400", 18);
-
+        const collateralAmount = ethers.parseUnits("350", 18);
         // Approve tokens for loan contract
-        await testToken.connect(borrower).approve(loan.address, collateralAmount);
-
+        await testToken.connect(borrower).approve(loan.target, collateralAmount);
         // Deposit collateral
         await loan.connect(borrower).depositCollateral(collateralAmount);
 
@@ -62,10 +67,10 @@ describe("Loan Contract", function () {
     });
 
     it("Should calculate interest correctly", async function () {
-        const collateralAmount = ethers.utils.parseUnits("1400", 18);
+        const collateralAmount = ethers.parseUnits("1400", 18);
 
         // Approve tokens for loan contract
-        await testToken.connect(borrower).approve(loan.address, collateralAmount);
+        await testToken.connect(borrower).approve(loan.target, collateralAmount);
 
         // Deposit collateral
         await loan.connect(borrower).depositCollateral(collateralAmount);
@@ -79,36 +84,36 @@ describe("Loan Contract", function () {
     });
 
     it("Should allow repayment", async function () {
-        const collateralAmount = ethers.utils.parseUnits("1400", 18);
+        const collateralAmount = ethers.parseUnits("1400", 18);
 
         // Approve tokens for loan contract
-        await testToken.connect(borrower).approve(loan.address, collateralAmount);
+        await testToken.connect(borrower).approve(loan.target, collateralAmount);
 
         // Deposit collateral
         await loan.connect(borrower).depositCollateral(collateralAmount);
 
-        const repaymentAmount = ethers.utils.parseUnits("500", 18);
+        const repaymentAmount = ethers.parseUnits("500", 18);
 
         // Approve tokens for loan contract
-        await testToken.connect(borrower).approve(loan.address, repaymentAmount);
+        await testToken.connect(borrower).approve(loan.target, repaymentAmount);
 
         // Repay loan
         await loan.connect(borrower).repay(repaymentAmount);
 
-        expect(await loan.collateralTokenAmount()).to.equal(collateralAmount.add(repaymentAmount));
+        expect(await loan.collateralTokenAmount()).to.equal(collateralAmount + repaymentAmount);
     });
 
     it("Should liquidate loan if collateral value is below threshold", async function () {
-        const collateralAmount = ethers.utils.parseUnits("1400", 18);
+        const collateralAmount = ethers.parseUnits("1400", 18);
 
         // Approve tokens for loan contract
-        await testToken.connect(borrower).approve(loan.address, collateralAmount);
+        await testToken.connect(borrower).approve(loan.target, collateralAmount);
 
         // Deposit collateral
         await loan.connect(borrower).depositCollateral(collateralAmount);
 
         // Set collateral token price to a lower value
-        await oracle.connect(platform).updateTokenPrice(principalTokenId, ethers.utils.parseUnits("0.5", 18));
+        await oracle.connect(platform).updateTokenPrice(principalTokenId, ethers.parseUnits("0.5", 18));
 
         // Liquidate loan
         await loan.connect(lender).liquidate();
