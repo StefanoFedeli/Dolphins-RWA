@@ -27,7 +27,7 @@ describe("Oracle Contract", function () {
         await oracle.connect(owner).setStablecoinOracle("0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6",stablecoinPriceFeed.target);
         const price = await oracle.getStablecoinPrice("0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6");
 
-        expect(price).to.equal(ethers.parseUnits("1", 8)); // Expecting $1.00
+        expect(price).to.equal(ethers.parseUnits("1", 18)); // Expecting $1.00
     });
 
     it("Should allow owner to update tokenized bond price", async function () {

@@ -1,20 +1,20 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+const DECIMALS = (10 ** 18).toString().replaceAll('1','0').substring(0,18);
+
 describe("Loan Contract", function () {
-    let Loan;
     let loan;
     let oracle;
     let testToken;
     let platform;
     let lender;
     let borrower;
-    let collateralTokenAddress;
 
-    const principalAmount = ethers.parseUnits("1", 18);
+    const principalAmount = ethers.parseUnits("30", 18); // 30 Apple stocks
     const principalTokenId = 1;
-    const interestRate = ethers.parseUnits("500",0); // 5%
-    const risk = 14000; // 140%
+    const interestRate = ethers.parseUnits("5.56",3); // 5.56%
+    const risk = 140000; // 140%
 
     beforeEach(async function () {
         const Oracle = await ethers.getContractFactory("Oracle");
@@ -24,7 +24,7 @@ describe("Loan Contract", function () {
 
         [platform, lender, borrower, collateralTokenAddress] = await ethers.getSigners();
 
-        stablecoinPriceFeed = await MockPriceFeed.deploy(8, ethers.parseUnits("1", 8)); 
+        stablecoinPriceFeed = await MockPriceFeed.deploy(6, ethers.parseUnits("1", 6));  // 1$ but with 6 decimals
         await stablecoinPriceFeed.waitForDeployment();
 
 
@@ -35,7 +35,7 @@ describe("Loan Contract", function () {
         await testToken.waitForDeployment();
 
         // Set token price in oracle
-        await oracle.connect(platform).updateTokenPrice(principalTokenId, ethers.parseUnits("2",0)); // $2
+        await oracle.connect(platform).updateTokenPrice(principalTokenId, ethers.parseUnits("244.6",18)); // 244.60$
         await oracle.connect(platform).setStablecoinOracle(testToken.target,stablecoinPriceFeed.target);
 
         loan = await LoanContract.deploy(
@@ -52,39 +52,30 @@ describe("Loan Contract", function () {
         await loan.waitForDeployment();
 
         // Mint test tokens to borrower
-        await testToken.mint(borrower.address, ethers.parseUnits("5000", 18));
+        await testToken.mint(borrower.address, ethers.parseUnits("50000", 6)); // Mock 50_000 USDT
 
     });
 
     it("Should create a loan and deposit collateral", async function () {
-        const collateralAmount = ethers.parseUnits("350", 18);
-        // Approve tokens for loan contract
-        await testToken.connect(borrower).approve(loan.target, collateralAmount);
-        // Deposit collateral
-        await loan.connect(borrower).depositCollateral(collateralAmount);
-
-        expect(await loan.collateralTokenAmount()).to.equal(collateralAmount);
-    });
-
-    it("Should calculate interest correctly", async function () {
-        const collateralAmount = ethers.parseUnits("1400", 18);
+        /**
+         * Testing loaning a 30 Apple stocks (principalAmount) with 5.56% interest rate
+         * and 140% risk at 120% liquidation treshold. Collateral is price $APPL 244.60$ * 30 * 140% = 10273.2$
+         * Borrower should deposit 10273.2$ worth of stablecoin as collateral. 
+         * Stablecoin USDT is used as collateral. Has 6 decimals.
+         */
+        const collateralAmount = ethers.parseUnits("10273.2", 6);
 
         // Approve tokens for loan contract
         await testToken.connect(borrower).approve(loan.target, collateralAmount);
-
+        
         // Deposit collateral
         await loan.connect(borrower).depositCollateral(collateralAmount);
 
-        // Fast forward time
-        await ethers.provider.send("evm_increaseTime", [365 * 24 * 60 * 60]); // 1 year
-        await ethers.provider.send("evm_mine");
-
-        const interest = await loan.calculateInterest();
-        expect(interest).to.be.gt(0);
+        expect((await loan.scaledCollateralAmount()).toString()).to.equal("102732"+DECIMALS.substring(0,17));
     });
 
     it("Should allow repayment", async function () {
-        const collateralAmount = ethers.parseUnits("1400", 18);
+        const collateralAmount = ethers.parseUnits("10273.2", 6);
 
         // Approve tokens for loan contract
         await testToken.connect(borrower).approve(loan.target, collateralAmount);
@@ -92,7 +83,7 @@ describe("Loan Contract", function () {
         // Deposit collateral
         await loan.connect(borrower).depositCollateral(collateralAmount);
 
-        const repaymentAmount = ethers.parseUnits("500", 18);
+        const repaymentAmount = ethers.parseUnits("500", 6); // 500 USDT
 
         // Approve tokens for loan contract
         await testToken.connect(borrower).approve(loan.target, repaymentAmount);
@@ -100,11 +91,11 @@ describe("Loan Contract", function () {
         // Repay loan
         await loan.connect(borrower).repay(repaymentAmount);
 
-        expect(await loan.collateralTokenAmount()).to.equal(collateralAmount + repaymentAmount);
+        expect(await loan.scaledCollateralAmount()).to.equal("107732"+DECIMALS.substring(0,17));
     });
 
     it("Should liquidate loan if collateral value is below threshold", async function () {
-        const collateralAmount = ethers.parseUnits("1400", 18);
+        const collateralAmount = ethers.parseUnits("10273.2", 6);
 
         // Approve tokens for loan contract
         await testToken.connect(borrower).approve(loan.target, collateralAmount);
@@ -112,12 +103,12 @@ describe("Loan Contract", function () {
         // Deposit collateral
         await loan.connect(borrower).depositCollateral(collateralAmount);
 
-        // Set collateral token price to a lower value
-        await oracle.connect(platform).updateTokenPrice(principalTokenId, ethers.parseUnits("0.5", 18));
+        // Set borrwed token price to a higher price
+        await oracle.connect(platform).updateTokenPrice(principalTokenId, ethers.parseUnits("500",18)); // 500 USDT
 
         // Liquidate loan
         await loan.connect(lender).liquidate();
 
-        expect(await loan.collateralTokenAmount()).to.equal(0);
+        expect(await loan.scaledCollateralAmount()).to.equal(0);
     });
 });

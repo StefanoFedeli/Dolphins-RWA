@@ -2,13 +2,18 @@
 pragma solidity ^0.8.20;
 
 contract MockV3Aggregator {
-    uint8 public decimals;
+    uint8 private _decimals;
     int256 public latestAnswer;
 
-    constructor(uint8 _decimals, int256 _initialAnswer) {
-        decimals = _decimals;
+    constructor(uint8 _decimal, int256 _initialAnswer) {
+        _decimals = _decimal;
         latestAnswer = _initialAnswer;
     }
+
+    function decimals() external view returns (uint8) {
+        return _decimals;
+    }
+
 
     function latestRoundData()
         external

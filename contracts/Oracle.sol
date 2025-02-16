@@ -22,6 +22,7 @@ contract Oracle is Ownable {
      * @param price New price in USD (with 18 decimals precision).
      */
     function updateTokenPrice(uint256 tokenID, uint256 price) external onlyOwner {
+        //@todo Add safety to prevent price manipulation. Avoid drops higher than 5% in a single update.
         require(price > 0, "Invalid price");
         blueDolphinTokens[tokenID] = price;
         emit TokenPriceUpdated(tokenID, price);
@@ -57,9 +58,17 @@ contract Oracle is Ownable {
         AggregatorV3Interface oracle = stablecoinOracles[stablecoin];
         require(address(oracle) != address(0), "Oracle not set for stablecoin");
 
+        uint8 decimals = oracle.decimals();
         (, int256 price, , , ) = oracle.latestRoundData();
         require(price > 0, "Invalid price data");
 
-        return uint256(price);
+        // Scale the price to 18 decimals
+        if (decimals > 18) {
+            price = price / int256(10**(decimals - 18));
+        } else if (decimals < 18) {
+            price = price * int256(10**(18 - decimals));
+        }
+
+    return uint256(price);
     }
 }
