@@ -67,11 +67,21 @@ describe("Loan Contract", function () {
 
         // Approve tokens for loan contract
         await testToken.connect(borrower).approve(loan.target, collateralAmount);
+
+
+        // Impossible to call any other method then depositCollateral
+        await expect(loan.connect(borrower).repay(1)).to.be.reverted;
+        await expect(loan.connect(platform).liquidate()).to.be.reverted;
+
         
         // Deposit collateral
         await loan.connect(borrower).depositCollateral(collateralAmount);
 
         expect((await loan.scaledCollateralAmount()).toString()).to.equal("102732"+DECIMALS.substring(0,17));
+        // Borrower balance should be 50000 - 10273.2 = 39726.8
+        expect((await testToken.balanceOf(borrower.address)).toString()).to.equal("397268"+DECIMALS.substring(0,5));
+
+
     });
 
     it("Should allow repayment", async function () {

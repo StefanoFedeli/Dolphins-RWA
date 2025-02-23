@@ -107,11 +107,11 @@ contract Loan is ReentrancyGuard, Ownable, DecimalUtility {
     }
 
     function liquidate() external nonReentrant {
+        require(startTime > 0, "Collateral has not been deposited yet");
         // Liquidation can be done if the contract is frozen or the collateral value is below the liquidation threshold
         uint256 usdPriceCollateral = oracle.getStablecoinPrice(address(collateralToken));
         uint256 usdPricePrincipal = oracle.getTokenPrice(principalTokenId);
         uint256 collateralFullAmount =  usdPriceCollateral * scaledCollateralAmount / 10**18;
-        console.log("collateralTokenAmount: ", collateralFullAmount);
         require(usdPriceCollateral > 0 && usdPricePrincipal > 0, "Price not available");
         require(isFrozen || collateralFullAmount < liquidationTreashold * usdPricePrincipal * scaledPrincipalAmount, "Cannot liquidate yet");
 
